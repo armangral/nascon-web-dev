@@ -38,12 +38,12 @@ export const LandingHeader = () => {
                 {item.name}
               </Link>
             ))}
-            <Link to="/login">
+            <Link to="/auth/login">
               <Button variant="outline" className="ml-4">
                 Log in
               </Button>
             </Link>
-            <Link to="/register">
+            <Link to="/auth/register">
               <Button className="bg-purple-600 hover:bg-purple-700 text-white">
                 Sign up
               </Button>
@@ -82,12 +82,12 @@ export const LandingHeader = () => {
                 </Link>
               ))}
               <div className="mt-4 space-y-2">
-                <Link to="/login" className="block w-full">
+                <Link to="/auth/login" className="block w-full">
                   <Button variant="outline" className="w-full">
                     Log in
                   </Button>
                 </Link>
-                <Link to="/register" className="block w-full">
+                <Link to="/auth/register" className="block w-full">
                   <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
                     Sign up
                   </Button>

@@ -1,96 +1,141 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Input } from '../ui/input';
-import { Button } from '../ui/button';
-import { useAuthStore } from '../../store/auth-store';
-import { isValidEmail } from '../../lib/utils';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "../ui/button";
+import { useAuthStore } from "../../store/auth-store";
+import toast from "react-hot-toast";
 
 interface AuthFormProps {
-  type: 'login' | 'register';
+  type: "login" | "register";
 }
 
 export function AuthForm({ type }: AuthFormProps) {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuthStore();
-  
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<'student' | 'tutor'>('student');
+  const { signIn, signUp, error: authError } = useAuthStore();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState<"student" | "tutor">("student");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
-  
+
+  // Reset errors when input changes
+  const handleInputChange = (field: string, value: string) => {
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: "" });
+    }
+
+    // Update the corresponding state
+    switch (field) {
+      case "email":
+        setEmail(value);
+        break;
+      case "password":
+        setPassword(value);
+        break;
+      case "fullName":
+        setFullName(value);
+        break;
+      default:
+        break;
+    }
+  };
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!email) {
-      newErrors.email = 'Email is required';
-    } else if (!isValidEmail(email)) {
-      newErrors.email = 'Invalid email format';
+      newErrors.email = "Email is required";
+    } else if (!emailRegex.test(email)) {
+      newErrors.email = "Invalid email format";
     }
-    
+
+    // Updated password regex
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     if (!password) {
-      newErrors.password = 'Password is required';
-    } else if (password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+      newErrors.password = "Password is required";
+    } else if (!passwordRegex.test(password)) {
+      newErrors.password =
+        "Password must be at least 8 characters with uppercase, lowercase, number, and special character";
     }
-    
-    if (type === 'register' && !fullName) {
-      newErrors.fullName = 'Full name is required';
+
+    if (type === "register" && !fullName) {
+      newErrors.fullName = "Full name is required";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
-    
+
+    if (!validateForm()) {
+      // Show toast for validation errors
+      toast.error("Please fix the errors in the form");
+      return;
+    }
+
     setIsLoading(true);
-    
+
     try {
-      if (type === 'login') {
+      if (type === "login") {
         await signIn(email, password);
-        navigate('/dashboard');
+        toast.success("Successfully logged in!");
+        navigate("/dashboard");
       } else {
         await signUp(email, password, fullName, role);
-        navigate('/dashboard');
+        toast.success("Registration successful! Welcome to our platform.");
+        navigate("/dashboard");
       }
-    } catch (error) {
-      console.error('Authentication error:', error);
-      setErrors({
-        form: 'Authentication failed. Please try again.',
-      });
+    } catch (error: any) {
+      console.error("Authentication error:", error);
+      // Error handling will be done via the authError from the store
     } finally {
       setIsLoading(false);
     }
   };
-  
+
+  // Show auth error from store using toast
+  React.useEffect(() => {
+    if (authError) {
+      if (authError.includes("Email not confirmed")) {
+        toast.error("Please confirm your email before logging in.");
+      } else if (authError.includes("Invalid login credentials")) {
+        toast.error("Invalid email or password. Please try again.");
+      } else if (authError.includes("already registered")) {
+        toast.error("This email is already registered.");
+      } else {
+        toast.error(authError);
+      }
+    }
+  }, [authError]);
+
   return (
     <div className="max-w-md w-full space-y-8">
       <div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          {type === 'login' ? 'Sign in to your account' : 'Create your account'}
+          {type === "login" ? "Sign in to your account" : "Create your account"}
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          {type === 'login' ? (
+          {type === "login" ? (
             <>
-              Or{' '}
+              Or{" "}
               <button
-                onClick={() => navigate('/auth/register')}
-                className="font-medium text-blue-600 hover:text-blue-500"
+                onClick={() => navigate("/auth/register")}
+                className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
               >
                 create a new account
               </button>
             </>
           ) : (
             <>
-              Already have an account?{' '}
+              Already have an account?{" "}
               <button
-                onClick={() => navigate('/auth/login')}
-                className="font-medium text-blue-600 hover:text-blue-500"
+                onClick={() => navigate("/auth/login")}
+                className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
               >
                 Sign in
               </button>
@@ -98,68 +143,109 @@ export function AuthForm({ type }: AuthFormProps) {
           )}
         </p>
       </div>
-      
+
       <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-        {errors.form && (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">{errors.form}</h3>
+        <div className="rounded-md shadow-sm space-y-4">
+          {type === "register" && (
+            <div>
+              <label
+                htmlFor="fullName"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Full Name
+              </label>
+              <div>
+                <input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  value={fullName}
+                  onChange={(e) =>
+                    handleInputChange("fullName", e.target.value)
+                  }
+                  className={`appearance-none relative block w-full px-3 py-2 border ${
+                    errors.fullName ? "border-red-300" : "border-gray-300"
+                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm`}
+                  placeholder="John Doe"
+                />
+                {errors.fullName && (
+                  <p className="mt-1 text-sm text-red-600">{errors.fullName}</p>
+                )}
               </div>
             </div>
-          </div>
-        )}
-        
-        <div className="rounded-md shadow-sm space-y-4">
-          {type === 'register' && (
-            <Input
-              id="fullName"
-              name="fullName"
-              type="text"
-              label="Full Name"
-              autoComplete="name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              error={errors.fullName}
-              required
-            />
           )}
-          
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            label="Email address"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={errors.email}
-            required
-          />
-          
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            label="Password"
-            autoComplete={type === 'login' ? 'current-password' : 'new-password'}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            error={errors.password}
-            required
-          />
-          
-          {type === 'register' && (
+
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Email address
+            </label>
+            <div>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => handleInputChange("email", e.target.value)}
+                className={`appearance-none relative block w-full px-3 py-2 border ${
+                  errors.email ? "border-red-300" : "border-gray-300"
+                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm`}
+                placeholder="your@email.com"
+              />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Password
+            </label>
+            <div>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete={
+                  type === "login" ? "current-password" : "new-password"
+                }
+                required
+                value={password}
+                onChange={(e) => handleInputChange("password", e.target.value)}
+                className={`appearance-none relative block w-full px-3 py-2 border ${
+                  errors.password ? "border-red-300" : "border-gray-300"
+                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm`}
+                placeholder="••••••••"
+              />
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+              )}
+            </div>
+          </div>
+
+          {type === "register" && (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">I am a:</label>
+              <label className="block text-sm font-medium text-gray-700">
+                I am a:
+              </label>
               <div className="flex space-x-4">
                 <label className="flex items-center">
                   <input
                     type="radio"
                     name="role"
                     value="student"
-                    checked={role === 'student'}
-                    onChange={() => setRole('student')}
+                    checked={role === "student"}
+                    onChange={() => setRole("student")}
                     className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="ml-2 text-sm text-gray-700">Student</span>
@@ -169,8 +255,8 @@ export function AuthForm({ type }: AuthFormProps) {
                     type="radio"
                     name="role"
                     value="tutor"
-                    checked={role === 'tutor'}
-                    onChange={() => setRole('tutor')}
+                    checked={role === "tutor"}
+                    onChange={() => setRole("tutor")}
                     className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="ml-2 text-sm text-gray-700">Tutor</span>
@@ -179,26 +265,54 @@ export function AuthForm({ type }: AuthFormProps) {
             </div>
           )}
         </div>
-        
-        {type === 'login' && (
+
+        {type === "login" && (
           <div className="flex items-center justify-end">
             <div className="text-sm">
               <button
                 type="button"
-                className="font-medium text-blue-600 hover:text-blue-500"
+                className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
               >
                 Forgot your password?
               </button>
             </div>
           </div>
         )}
-        
+
         <Button
           type="submit"
-          className="w-full"
-          isLoading={isLoading}
+          className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+          disabled={isLoading}
         >
-          {type === 'login' ? 'Sign in' : 'Sign up'}
+          {isLoading ? (
+            <span className="flex items-center">
+              <svg
+                className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              Processing...
+            </span>
+          ) : type === "login" ? (
+            "Sign in"
+          ) : (
+            "Sign up"
+          )}
         </Button>
       </form>
     </div>

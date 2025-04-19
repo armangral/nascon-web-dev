@@ -19,6 +19,8 @@ const CourseContent: React.FC<CourseContentProps> = ({ courseId }) => {
   const [error, setError] = useState<string | null>(null);
   const { openModal } = useModalStore();
   const { user } = useAuthStore();
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false); // State to control confirmation modal
+  const [lectureToDelete, setLectureToDelete] = useState<number | null>(null); // Index of lecture to delete
 
   const isTutor = user?.role === "tutor";
   const isCourseTutor = user?.id === lectures[0]?.tutor_id;
@@ -74,13 +76,43 @@ const CourseContent: React.FC<CourseContentProps> = ({ courseId }) => {
     setLectures(updatedLectures);
   };
 
-  const removeLecture = (index: number) => {
-    const updatedLectures = lectures.filter((_, i) => i !== index);
+  // const removeLecture = (index: number) => {
+  //   const updatedLectures = lectures.filter((_, i) => i !== index);
+  //   // Reorder positions
+  //   updatedLectures.forEach((lecture, i) => {
+  //     lecture.position = i + 1;
+  //   });
+  //   setLectures(updatedLectures);
+  // };
+
+  const removeLecture = async () => {
+    if (lectureToDelete === null) return;
+
+    const lectureToDeleteObj = lectures[lectureToDelete];
+
+    // If lecture has an ID, it's already in the database
+    if (lectureToDeleteObj.id) {
+      const { error } = await supabase
+        .from("lectures")
+        .delete()
+        .eq("id", lectureToDeleteObj.id);
+
+      if (error) {
+        console.error("Failed to delete lecture:", error);
+        setError("Failed to delete lecture");
+        return;
+      }
+    }
+
+    // Remove from UI
+    const updatedLectures = lectures.filter((_, i) => i !== lectureToDelete);
     // Reorder positions
     updatedLectures.forEach((lecture, i) => {
       lecture.position = i + 1;
     });
+
     setLectures(updatedLectures);
+    setShowConfirmDelete(false); // Close confirmation modal
   };
 
   const moveLecture = (index: number, direction: "up" | "down") => {
@@ -176,6 +208,16 @@ const CourseContent: React.FC<CourseContentProps> = ({ courseId }) => {
     openModal("upload", courseId);
   };
 
+  const openDeleteConfirm = (index: number) => {
+    setLectureToDelete(index);
+    setShowConfirmDelete(true);
+  };
+
+  const closeDeleteConfirm = () => {
+    setLectureToDelete(null);
+    setShowConfirmDelete(false);
+  };
+
   return (
     <div className="space-y-6 my-6">
       <UploadContentModal />
@@ -258,7 +300,7 @@ const CourseContent: React.FC<CourseContentProps> = ({ courseId }) => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => removeLecture(index)}
+                    onClick={() => openDeleteConfirm(index)}
                     className="text-red-500 hover:text-red-700"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -417,6 +459,32 @@ const CourseContent: React.FC<CourseContentProps> = ({ courseId }) => {
               "Save All Lectures"
             )}
           </button>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmDelete && (
+        <div className="fixed inset-0 flex justify-center items-center z-50 bg-gray-600 bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+            <h3 className="text-lg font-semibold">Are you sure?</h3>
+            <p className="text-sm text-gray-500">
+              This action will permanently delete the lecture.
+            </p>
+            <div className="mt-4 flex justify-end space-x-3">
+              <button
+                onClick={closeDeleteConfirm}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={removeLecture}
+                className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-md"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
